@@ -111,6 +111,7 @@ sequenceDiagram
     deactivate Service
     
     BoardCtrl-->>User: 목록 페이지로 Redirect
+```
 
 ```mermaid
 
