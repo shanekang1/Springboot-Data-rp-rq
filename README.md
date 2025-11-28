@@ -334,3 +334,79 @@ CascadeType.ALL 설정 덕분에 게시글이 저장될 때 소속된 이미지�
 게시글을 저장할 때는 파일의 **이름표(문자열)**만 가지고 와서 DB에 저장합니다. (BoardController)
 
 이 둘을 연결해 주는 다리 역할은 자바스크립트의 <hidden> 태그와 dtoToEntity 변환 메서드가 수행합니다.
+
+
+# 4 list modify 플로우
+
+## 4-1 목록조회(read)
+
+```mermaid
+sequenceDiagram
+    actor User as 사용자
+    participant View as list.html
+    participant Ctrl as BoardController
+    participant Svc as BoardServiceImpl
+    participant Repo as BoardSearchImpl
+    participant DB as MariaDB
+
+    User->>View: 목록 메뉴 클릭
+    View->>Ctrl: GET /board/list
+    Ctrl->>Svc: listWithAll()
+    Svc->>Repo: searchWithAll()
+    
+    Note right of Repo: 1. Board+Reply 조인 (Tuple)<br/>2. ImageSet 조회 (@BatchSize)
+    Repo->>DB: SQL 실행 (Select Board...)
+    Repo->>DB: SQL 실행 (Select Images... IN ...)
+    DB-->>Repo: 데이터 반환
+    
+    Repo-->>Svc: Page&lt;BoardListAllDTO&gt;
+    Svc-->>Ctrl: PageResponseDTO
+    Ctrl-->>View: Model에 담아 전달
+    View-->>User: 목록 화면 렌더링 (이미지+댓글수 포함)
+```
+
+## 4-2 modify
+
+```mermaid
+sequenceDiagram
+    actor User as 사용자
+    participant View as modify.html (JS)
+    participant Ctrl as BoardController
+    participant Svc as BoardServiceImpl
+    participant DB as MariaDB
+
+    %% 진입
+    User->>View: [Modify] 버튼 클릭 (수정 내용 작성)
+    
+    %% 파일 조작 (JS 레벨)
+    rect rgb(255, 240, 240)
+        Note over User, View: [JS] 파일 삭제/추가 조작
+        User->>View: 이미지 [X] 버튼 클릭
+        View->>View: removeFile() -> 화면에서 제거
+        User->>View: 파일 업로드 (AJAX)
+        View->>View: showUploadFile() -> 화면에 추가
+    end
+
+    %% 서버 전송
+    User->>View: [Modify] Submit 클릭
+    View->>Ctrl: POST /board/modify (제목, 내용, 최종파일목록)
+    
+    activate Ctrl
+    Ctrl->>Svc: modify(BoardDTO)
+    activate Svc
+    
+    Svc->>DB: findById(bno) -> Entity 조회
+    
+    Note right of Svc: 1. clearImages() : 기존 파일 삭제<br/>2. addImage() : 최종 파일 다시 등록
+    
+    Svc->>DB: save(board)
+    DB-->>Svc: Update 완료
+    
+    Svc-->>Ctrl: void
+    deactivate Svc
+    
+    Ctrl-->>View: Redirect to /read
+    deactivate Ctrl
+```
+
+# wkd
